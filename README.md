@@ -34,7 +34,7 @@ clock-in-system-mvp/
 3. Enable **Authentication > Sign-in method > Email/Password**.
 4. Create a **Cloud Firestore** database.
 5. Copy `firebase-config.example.js` to `firebase-config.js`.
-6. Paste your Firebase web app config into `firebase-config.js`.
+6. Paste your Firebase web app config into `firebase-config.js`. (Note: This file is ignored by Git to keep your API key secure).
 7. Publish `firestore.rules` to Firestore Rules.
 
 ## Create the first admin
@@ -150,11 +150,15 @@ http://localhost:8080
 
 ## Deploy to GitHub Pages
 
-1. Commit these files to a GitHub repository.
-2. Make sure `firebase-config.js` exists in the deployed branch.
-3. Go to **Repository Settings > Pages**.
-4. Select the branch and root folder.
-5. Save.
+This project uses GitHub Actions to deploy automatically while keeping your API key secret.
+
+1. **Add Secret**: Go to your GitHub Repository > **Settings** > **Secrets and variables** > **Actions**.
+2. **New Secret**: Click "New repository secret".
+   - Name: `FIREBASE_CONFIG`
+   - Value: The entire contents of your `firebase-config.js` file.
+3. **Commit and Push**: Push your changes to the `main` branch.
+4. **Automatic Deploy**: GitHub Actions will automatically create the config file from the secret and deploy to the `gh-pages` branch.
+5. **Enable Pages**: If it's your first time, go to **Settings** > **Pages** and ensure "Build and deployment" is set to "Deploy from a branch" and the branch is `gh-pages`.
 
 ## Important MVP notes
 
