@@ -1,167 +1,60 @@
-# Clock In System MVP
+# Sistema de Controle de Ponto (MVP)
 
-A static HTML, CSS, and JavaScript MVP for worker attendance tracking with Firebase Authentication and Cloud Firestore.
+Um sistema simples e funcional para registro de presença de funcionários, construído com HTML, CSS e JavaScript puro, integrado ao Firebase (Authentication e Firestore).
 
-## What is included
+## Funcionalidades
 
-- Email/password login using Firebase Authentication
-- Role-based access for `admin` and `worker`
-- Worker clock in / clock out flow
-- Admin dashboard overview
-- Admin CRUD-style management for departments and job titles
-- Admin worker account creation using a secondary Firebase app instance
-- Worker activation/deactivation
-- Attendance tables and basic filters
-- Starter Firestore security rules
-- GitHub Pages-compatible static frontend
+- **Login Seguro**: Acesso via e-mail e senha.
+- **Dois Níveis de Acesso**:
+  - **Funcionário**: Bate ponto (entrada/saída) e visualiza seu histórico recente.
+  - **Administrador**: Gerencia funcionários, departamentos, cargos e visualiza logs de presença de toda a equipe.
+- **Gestão de Equipe**: Criação de contas de funcionários diretamente pelo painel administrativo.
+- **Painel de Monitoramento**: Visualização em tempo real de quem está em serviço.
+- **Filtros e Buscas**: Busca de funcionários e filtragem de logs por departamento ou status.
 
-## Project structure
+## Estrutura do Projeto
 
 ```txt
-clock-in-system-mvp/
-├── index.html
-├── styles.css
-├── app.js
-├── firebase-config.example.js
-├── firestore.rules
-└── README.md
+Ponto/
+├── index.html          # Interface do usuário (UI)
+├── styles.css          # Estilização visual
+├── app.js              # Lógica da aplicação e integração Firebase
+├── firebase-config.js  # Configurações do seu projeto Firebase (não versionado)
+├── firestore.rules     # Regras de segurança do banco de dados
+└── README.md           # Documentação do projeto
 ```
 
-## Firebase setup
+## Configuração Inicial
 
-1. Create a Firebase project.
-2. Add a Web App in Firebase Console.
-3. Enable **Authentication > Sign-in method > Email/Password**.
-4. Create a **Cloud Firestore** database.
-5. Copy `firebase-config.example.js` to `firebase-config.js`.
-6. Paste your Firebase web app config into `firebase-config.js`. (Note: This file is ignored by Git to keep your API key secure).
-7. Publish `firestore.rules` to Firestore Rules.
+### 1. Firebase
+1. Crie um projeto no [Firebase Console](https://console.firebase.google.com/).
+2. Adicione um "Web App" e copie as credenciais de configuração.
+3. No menu **Authentication**, ative o método de login por **E-mail/Senha**.
+4. Crie um banco de dados **Cloud Firestore**.
+5. Copie o arquivo `firebase-config.example.js` para um novo arquivo chamado `firebase-config.js`.
+6. Cole suas credenciais no `firebase-config.js`.
 
-## Create the first admin
+### 2. Regras de Segurança
+Copie o conteúdo de `firestore.rules` e cole na aba **Rules** do seu Cloud Firestore no console do Firebase.
 
-This MVP intentionally does not allow public self-registration.
+### 3. Criando o Primeiro Administrador
+Para bootstrap do sistema, existe uma aba oculta de "IT":
+1. No console do Firebase, crie manualmente um documento na coleção `system` com o ID `config`.
+2. Adicione um campo `it_access_code` (ex: `123456`).
+3. No aplicativo, clique no botão **IT** no canto inferior direito.
+4. Insira o código definido e crie a primeira conta de administrador.
 
-1. In Firebase Console, create an Authentication user manually.
-2. Copy that user's UID.
-3. In Cloud Firestore, create a document:
+## Como Executar
 
-```txt
-Collection: users
-Document ID: <ADMIN_AUTH_UID>
-```
-
-Use this document data:
-
-```json
-{
-  "email": "admin@company.com",
-  "role": "admin",
-  "active": true
-}
-```
-
-4. Log in to the app with that admin email/password.
-5. Add departments and titles.
-6. Add workers. The admin dashboard will create worker Auth accounts and worker profile documents.
-
-## Firestore collections
-
-### users/{uid}
-
-```json
-{
-  "email": "worker@company.com",
-  "role": "worker",
-  "workerId": "workersDocId",
-  "active": true,
-  "createdAt": "serverTimestamp",
-  "updatedAt": "serverTimestamp"
-}
-```
-
-### workers/{workerId}
-
-```json
-{
-  "name": "Jane Worker",
-  "email": "jane@company.com",
-  "departmentId": "departmentDocId",
-  "titleId": "titleDocId",
-  "userId": "firebaseAuthUid",
-  "active": true,
-  "createdAt": "serverTimestamp",
-  "updatedAt": "serverTimestamp"
-}
-```
-
-### departments/{departmentId}
-
-```json
-{
-  "name": "Operations",
-  "active": true,
-  "createdAt": "serverTimestamp",
-  "updatedAt": "serverTimestamp"
-}
-```
-
-### titles/{titleId}
-
-```json
-{
-  "name": "Warehouse Associate",
-  "active": true,
-  "createdAt": "serverTimestamp",
-  "updatedAt": "serverTimestamp"
-}
-```
-
-### attendance/{attendanceId}
-
-```json
-{
-  "workerId": "workerDocId",
-  "userId": "firebaseAuthUid",
-  "workerName": "Jane Worker",
-  "departmentId": "departmentDocId",
-  "titleId": "titleDocId",
-  "clockInAt": "serverTimestamp",
-  "clockOutAt": null,
-  "dateKey": "2026-05-06",
-  "status": "clocked-in",
-  "createdAt": "serverTimestamp",
-  "updatedAt": "serverTimestamp"
-}
-```
-
-## Run locally
-
-Because the app uses JavaScript modules, run it through a local server rather than opening `index.html` directly:
+Como o projeto utiliza módulos JavaScript, ele precisa ser servido por um servidor local. Você pode usar a extensão "Live Server" do VS Code ou via terminal:
 
 ```bash
-python3 -m http.server 8080
+# Se tiver Python instalado
+python -m http.server 8080
 ```
 
-Open:
+Acesse em: `http://localhost:8080`
 
-```txt
-http://localhost:8080
-```
-
-## Deploy to GitHub Pages
-
-This project uses GitHub Actions to deploy automatically while keeping your API key secret.
-
-1. **Add Secret**: Go to your GitHub Repository > **Settings** > **Secrets and variables** > **Actions**.
-2. **New Secret**: Click "New repository secret".
-   - Name: `FIREBASE_CONFIG`
-   - Value: The entire contents of your `firebase-config.js` file.
-3. **Commit and Push**: Push your changes to the `main` branch.
-4. **Automatic Deploy**: GitHub Actions will automatically create the config file from the secret and deploy to the `gh-pages` branch.
-5. **Enable Pages**: If it's your first time, go to **Settings** > **Pages** and ensure "Build and deployment" is set to "Deploy from a branch" and the branch is `gh-pages`.
-
-## Important MVP notes
-
-- Firebase web config is not a secret, but Firestore Rules are security-critical.
-- A production system should move user creation to a trusted backend such as Cloud Functions or an admin-only server because client-side account creation is limited by frontend trust boundaries.
-- Attendance edit/export, password reset, audit logs, geolocation, shift schedules, and payroll reports are natural next features.
+## Notas Importantes
+- **Segurança**: As regras de segurança no `firestore.rules` garantem que funcionários só vejam seus próprios dados e que apenas administradores façam alterações críticas.
+- **Privacidade**: O arquivo `firebase-config.js` contém chaves públicas do Firebase, mas é boa prática mantê-lo fora do controle de versão se o projeto for público.
