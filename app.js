@@ -37,7 +37,8 @@ const state = {
   departments: [],
   titles: [],
   workers: [],
-  attendance: []
+  attendance: [],
+  itCode: null
 };
 
 const $ = (id) => document.getElementById(id);
@@ -181,6 +182,7 @@ async function loadWorkerExperience() {
 async function loadWorkerActiveAttendance(workerId) {
   const activeSnap = await getDocs(query(
     collection(db, "attendance"),
+    where("userId", "==", state.currentUser.uid),
     where("workerId", "==", workerId),
     where("status", "==", "clocked-in"),
     limit(1)
@@ -209,11 +211,12 @@ async function renderWorkerDashboard() {
 async function renderWorkerAttendance() {
   const snap = await getDocs(query(
     collection(db, "attendance"),
-    where("workerId", "==", state.workerProfile.id),
-    orderBy("clockInAt", "desc"),
-    limit(10)
+    where("userId", "==", state.currentUser.uid),
+    where("workerId", "==", state.workerProfile.id)
   ));
-  const rows = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+  let rows = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+  rows.sort((a, b) => (b.clockInAt?.toMillis() || 0) - (a.clockInAt?.toMillis() || 0));
+  rows = rows.slice(0, 10);
   $("workerAttendanceTable").innerHTML = rows.map((row) => `
     <tr>
       <td>${fmtDate(row.clockInAt)}</td>
@@ -354,7 +357,7 @@ async function createWorkerAccount({ name, email, password, departmentId, titleI
   }
 }
 
-async function createAdminAccount({ email, password }) {
+async function createAdminAccount({ email, password, itCode }) {
   const secondaryApp = initializeApp(firebaseConfig, `admin-create-${Date.now()}`);
   const secondaryAuth = getAuth(secondaryApp);
   try {
@@ -363,6 +366,7 @@ async function createAdminAccount({ email, password }) {
       email,
       role: "admin",
       active: true,
+      it_access_code: itCode, // Authorization for Firestore rules
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -497,6 +501,7 @@ function bindEvents() {
     try {
       const snap = await getDoc(doc(db, "system", "config"));
       if (snap.exists() && snap.data().it_access_code === code) {
+        state.itCode = code;
         $("itCodeStep").classList.add("hidden");
         $("itCreateStep").classList.remove("hidden");
       } else {
@@ -517,7 +522,8 @@ function bindEvents() {
     try {
       await createAdminAccount({
         email: $("itAdminEmail").value.trim(),
-        password: $("itAdminPassword").value
+        password: $("itAdminPassword").value,
+        itCode: state.itCode
       });
       showToast("Administrador criado com sucesso!");
       $("itAdminForm").reset();
