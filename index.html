@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sistema de Ponto MVP</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <main class="app-shell">
+      <section id="authView" class="auth-card">
+        <div class="brand-row">
+          <div class="brand-mark">SP</div>
+          <div>
+            <h1>Sistema de Ponto</h1>
+            <p>Controle de presença para funcionários e administradores.</p>
+          </div>
+        </div>
+
+        <form id="loginForm" class="stacked-form">
+          <label>
+            E-mail
+            <input id="loginEmail" type="email" autocomplete="email" placeholder="funcionario@empresa.com.br" required />
+          </label>
+          <label>
+            Senha
+            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" required />
+          </label>
+          <button type="submit" class="primary-btn full-width">Entrar</button>
+        </form>
+      </section>
+
+      <section id="appView" class="hidden">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Sistema de Ponto</p>
+            <h2 id="welcomeTitle">Bem-vindo</h2>
+          </div>
+          <div class="topbar-actions">
+            <span id="roleBadge" class="badge">Cargo</span>
+            <button id="logoutBtn" class="ghost-btn">Sair</button>
+          </div>
+        </header>
+
+        <section id="workerView" class="hidden dashboard-grid worker-grid">
+          <article class="panel hero-panel">
+            <p class="eyebrow">Terminal do funcionário</p>
+            <h3 id="workerStatusTitle">Pronto</h3>
+            <p id="workerStatusText">Seu status de presença aparecerá aqui.</p>
+            <button id="clockActionBtn" class="primary-btn clock-btn">Bater Ponto (Entrada)</button>
+          </article>
+
+          <article class="panel">
+            <h3>Sessão atual</h3>
+            <dl class="detail-list">
+              <div><dt>Funcionário</dt><dd id="workerNameValue">—</dd></div>
+              <div><dt>Departamento</dt><dd id="workerDepartmentValue">—</dd></div>
+              <div><dt>Cargo</dt><dd id="workerTitleValue">—</dd></div>
+              <div><dt>Entrada em</dt><dd id="clockInValue">—</dd></div>
+            </dl>
+          </article>
+
+          <article class="panel wide-panel">
+            <div class="panel-heading">
+              <h3>Presenças recentes</h3>
+              <button id="refreshWorkerLogsBtn" class="ghost-btn small-btn">Atualizar</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Status</th></tr>
+                </thead>
+                <tbody id="workerAttendanceTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section id="adminView" class="hidden admin-layout">
+          <aside class="side-nav">
+            <button class="tab-btn active" data-tab="overviewPanel">Visão Geral</button>
+            <button class="tab-btn" data-tab="workersPanel">Funcionários</button>
+            <button class="tab-btn" data-tab="departmentsPanel">Departamentos</button>
+            <button class="tab-btn" data-tab="titlesPanel">Cargos</button>
+            <button class="tab-btn" data-tab="attendancePanel">Presenças</button>
+          </aside>
+
+          <div class="admin-content">
+            <section id="overviewPanel" class="tab-panel">
+              <div class="metric-grid">
+                <article class="metric-card"><span id="metricWorkers">0</span><p>Funcionários ativos</p></article>
+                <article class="metric-card"><span id="metricClockedIn">0</span><p>Presentes agora</p></article>
+                <article class="metric-card"><span id="metricDepartments">0</span><p>Departamentos</p></article>
+                <article class="metric-card"><span id="metricTitles">0</span><p>Cargos</p></article>
+              </div>
+              <article class="panel">
+                <div class="panel-heading">
+                  <h3>Presentes no momento</h3>
+                  <button id="refreshOverviewBtn" class="ghost-btn small-btn">Atualizar</button>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Funcionário</th><th>Departamento</th><th>Cargo</th><th>Entrada</th></tr></thead>
+                    <tbody id="clockedInTable"></tbody>
+                  </table>
+                </div>
+              </article>
+            </section>
+
+            <section id="workersPanel" class="tab-panel hidden">
+              <article class="panel">
+                <div class="panel-heading">
+                  <h3>Adicionar funcionário</h3>
+                  <p>Crie uma conta de acesso e perfil de funcionário.</p>
+                </div>
+                <form id="workerForm" class="form-grid">
+                  <input id="workerName" placeholder="Nome completo" required />
+                  <input id="workerEmail" type="email" placeholder="E-mail" required />
+                  <input id="workerPassword" type="password" placeholder="Senha temporária" minlength="6" required />
+                  <select id="workerDepartment" required></select>
+                  <select id="workerTitle" required></select>
+                  <button class="primary-btn" type="submit">Adicionar funcionário</button>
+                </form>
+              </article>
+              <article class="panel">
+                <div class="panel-heading split">
+                  <h3>Funcionários</h3>
+                  <input id="workerSearch" class="search-input" placeholder="Buscar funcionários..." />
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Nome</th><th>E-mail</th><th>Departamento</th><th>Cargo</th><th>Status</th><th>Ações</th></tr></thead>
+                    <tbody id="workersTable"></tbody>
+                  </table>
+                </div>
+              </article>
+            </section>
+
+            <section id="departmentsPanel" class="tab-panel hidden">
+              <article class="panel compact-panel">
+                <h3>Departamentos</h3>
+                <form id="departmentForm" class="inline-form">
+                  <input id="departmentName" placeholder="Nome do departamento" required />
+                  <button class="primary-btn" type="submit">Salvar</button>
+                </form>
+                <ul id="departmentsList" class="item-list"></ul>
+              </article>
+            </section>
+
+            <section id="titlesPanel" class="tab-panel hidden">
+              <article class="panel compact-panel">
+                <h3>Cargos</h3>
+                <form id="titleForm" class="inline-form">
+                  <input id="titleName" placeholder="Nome do cargo" required />
+                  <button class="primary-btn" type="submit">Salvar</button>
+                </form>
+                <ul id="titlesList" class="item-list"></ul>
+              </article>
+            </section>
+
+            <section id="attendancePanel" class="tab-panel hidden">
+              <article class="panel">
+                <div class="panel-heading split">
+                  <h3>Logs de presença</h3>
+                  <div class="filter-row">
+                    <select id="attendanceDepartmentFilter"><option value="">Todos os departamentos</option></select>
+                    <select id="attendanceStatusFilter">
+                      <option value="">Todos os status</option>
+                      <option value="clocked-in">Em serviço</option>
+                      <option value="completed">Concluído</option>
+                    </select>
+                    <button id="refreshAttendanceBtn" class="ghost-btn small-btn">Atualizar</button>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Data</th><th>Funcionário</th><th>Departamento</th><th>Entrada</th><th>Saída</th><th>Status</th></tr></thead>
+                    <tbody id="attendanceTable"></tbody>
+                  </table>
+                </div>
+              </article>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
