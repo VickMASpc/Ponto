@@ -36,25 +36,3 @@ Ponto/
 
 ### 2. Regras de Segurança
 Copie o conteúdo de `firestore.rules` e cole na aba **Rules** do seu Cloud Firestore no console do Firebase.
-
-### 3. Criando o Primeiro Administrador
-Para bootstrap do sistema, existe uma aba oculta de "IT":
-1. No console do Firebase, crie manualmente um documento na coleção `system` com o ID `config`.
-2. Adicione um campo `it_access_code` (ex: `123456`).
-3. No aplicativo, clique no botão **IT** no canto inferior direito.
-4. Insira o código definido e crie a primeira conta de administrador.
-
-## Como Executar
-
-Como o projeto utiliza módulos JavaScript, ele precisa ser servido por um servidor local. Você pode usar a extensão "Live Server" do VS Code ou via terminal:
-
-```bash
-# Se tiver Python instalado
-python -m http.server 8080
-```
-
-Acesse em: `http://localhost:8080`
-
-## Notas Importantes
-- **Segurança**: As regras de segurança no `firestore.rules` garantem que funcionários só vejam seus próprios dados e que apenas administradores façam alterações críticas.
-- **Privacidade**: O arquivo `firebase-config.js` contém chaves públicas do Firebase, mas é boa prática mantê-lo fora do controle de versão se o projeto for público.
