@@ -37,7 +37,8 @@ const state = {
   departments: [],
   titles: [],
   workers: [],
-  attendance: []
+  attendance: [],
+  itCode: null
 };
 
 const $ = (id) => document.getElementById(id);
@@ -354,7 +355,7 @@ async function createWorkerAccount({ name, email, password, departmentId, titleI
   }
 }
 
-async function createAdminAccount({ email, password }) {
+async function createAdminAccount({ email, password, itCode }) {
   const secondaryApp = initializeApp(firebaseConfig, `admin-create-${Date.now()}`);
   const secondaryAuth = getAuth(secondaryApp);
   try {
@@ -363,6 +364,7 @@ async function createAdminAccount({ email, password }) {
       email,
       role: "admin",
       active: true,
+      it_access_code: itCode, // Authorization for Firestore rules
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -497,6 +499,7 @@ function bindEvents() {
     try {
       const snap = await getDoc(doc(db, "system", "config"));
       if (snap.exists() && snap.data().it_access_code === code) {
+        state.itCode = code;
         $("itCodeStep").classList.add("hidden");
         $("itCreateStep").classList.remove("hidden");
       } else {
@@ -517,7 +520,8 @@ function bindEvents() {
     try {
       await createAdminAccount({
         email: $("itAdminEmail").value.trim(),
-        password: $("itAdminPassword").value
+        password: $("itAdminPassword").value,
+        itCode: state.itCode
       });
       showToast("Administrador criado com sucesso!");
       $("itAdminForm").reset();

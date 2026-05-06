@@ -14,8 +14,9 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
+      allow create: if request.resource.data.it_access_code == get(/databases/$(database)/documents/system/config).data.it_access_code;
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isAdmin();
+      allow update, delete: if isAdmin();
     }
 
     // Workers collection
