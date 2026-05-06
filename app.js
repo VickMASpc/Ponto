@@ -182,6 +182,7 @@ async function loadWorkerExperience() {
 async function loadWorkerActiveAttendance(workerId) {
   const activeSnap = await getDocs(query(
     collection(db, "attendance"),
+    where("userId", "==", state.currentUser.uid),
     where("workerId", "==", workerId),
     where("status", "==", "clocked-in"),
     limit(1)
@@ -210,6 +211,7 @@ async function renderWorkerDashboard() {
 async function renderWorkerAttendance() {
   const snap = await getDocs(query(
     collection(db, "attendance"),
+    where("userId", "==", state.currentUser.uid),
     where("workerId", "==", state.workerProfile.id),
     orderBy("clockInAt", "desc"),
     limit(10)
