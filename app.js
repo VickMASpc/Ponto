@@ -212,11 +212,11 @@ async function renderWorkerAttendance() {
   const snap = await getDocs(query(
     collection(db, "attendance"),
     where("userId", "==", state.currentUser.uid),
-    where("workerId", "==", state.workerProfile.id),
-    orderBy("clockInAt", "desc"),
-    limit(10)
+    where("workerId", "==", state.workerProfile.id)
   ));
-  const rows = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+  let rows = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+  rows.sort((a, b) => (b.clockInAt?.toMillis() || 0) - (a.clockInAt?.toMillis() || 0));
+  rows = rows.slice(0, 10);
   $("workerAttendanceTable").innerHTML = rows.map((row) => `
     <tr>
       <td>${fmtDate(row.clockInAt)}</td>
