@@ -354,6 +354,24 @@ async function createWorkerAccount({ name, email, password, departmentId, titleI
   }
 }
 
+async function createAdminAccount({ email, password }) {
+  const secondaryApp = initializeApp(firebaseConfig, `admin-create-${Date.now()}`);
+  const secondaryAuth = getAuth(secondaryApp);
+  try {
+    const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    await setDoc(doc(db, "users", credential.user.uid), {
+      email,
+      role: "admin",
+      active: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  } finally {
+    await signOut(secondaryAuth).catch(() => {});
+    await deleteApp(secondaryApp).catch(() => {});
+  }
+}
+
 async function addNamedRecord(collectionName, name) {
   await addDoc(collection(db, collectionName), {
     name,
@@ -462,6 +480,59 @@ function bindEvents() {
       await loadAdminDashboard();
       showToast(active ? "Funcionário ativado." : "Funcionário desativado.");
     }
+  });
+
+  // IT Admin Events
+  $("itToggleBtn").addEventListener("click", () => {
+    $("itPanel").classList.toggle("hidden");
+    $("itAccessCode").value = "";
+    $("itCodeStep").classList.remove("hidden");
+    $("itCreateStep").classList.add("hidden");
+  });
+
+  $("itVerifyBtn").addEventListener("click", async () => {
+    const code = $("itAccessCode").value.trim();
+    if (!code) return;
+    setLoading($("itVerifyBtn"), true, "Verificando...");
+    try {
+      const snap = await getDoc(doc(db, "system", "config"));
+      if (snap.exists() && snap.data().it_access_code === code) {
+        $("itCodeStep").classList.add("hidden");
+        $("itCreateStep").classList.remove("hidden");
+      } else {
+        showToast("Código de acesso inválido.", "error");
+      }
+    } catch (error) {
+      console.error(error);
+      showToast("Erro ao verificar código.", "error");
+    } finally {
+      setLoading($("itVerifyBtn"), false);
+    }
+  });
+
+  $("itAdminForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.submitter;
+    setLoading(button, true, "Criando...");
+    try {
+      await createAdminAccount({
+        email: $("itAdminEmail").value.trim(),
+        password: $("itAdminPassword").value
+      });
+      showToast("Administrador criado com sucesso!");
+      $("itAdminForm").reset();
+      $("itPanel").classList.add("hidden");
+    } catch (error) {
+      console.error(error);
+      showToast(error.message, "error");
+    } finally {
+      setLoading(button, false);
+    }
+  });
+
+  $("itResetBtn").addEventListener("click", () => {
+    $("itCodeStep").classList.remove("hidden");
+    $("itCreateStep").classList.add("hidden");
   });
 }
 
