@@ -187,6 +187,27 @@
       </section>
     </main>
 
+    <!-- IT Admin Access -->
+    <div id="itAdminSection" class="it-admin-section">
+      <button id="itToggleBtn" class="it-toggle-btn">IT</button>
+      <div id="itPanel" class="it-panel hidden">
+        <div id="itCodeStep">
+          <h4>Acesso IT Admin</h4>
+          <input id="itAccessCode" type="password" placeholder="Código de acesso" />
+          <button id="itVerifyBtn" class="primary-btn small-btn">Verificar</button>
+        </div>
+        <div id="itCreateStep" class="hidden">
+          <h4>Novo Administrador</h4>
+          <form id="itAdminForm" class="stacked-form">
+            <input id="itAdminEmail" type="email" placeholder="E-mail" required />
+            <input id="itAdminPassword" type="password" placeholder="Senha" minlength="6" required />
+            <button type="submit" class="primary-btn small-btn">Criar Admin</button>
+            <button type="button" id="itResetBtn" class="ghost-btn small-btn">Voltar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="app.js"></script>
   </body>
 </html>

@@ -164,3 +164,57 @@ tr:last-child td { border-bottom: 0; }
   .inline-form, .filter-row { flex-direction: column; }
   .auth-card { margin-top: 3vh; padding: 24px; }
 }
+
+/* IT Admin Floating Panel */
+.it-admin-section {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.it-toggle-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--text);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  opacity: 0.3;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.it-toggle-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.it-panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 20px;
+  width: 280px;
+  box-shadow: var(--shadow);
+}
+
+.it-panel h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  color: var(--primary);
+}
+
+.it-panel input {
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  padding: 0.6rem;
+}
+
+.it-panel .stacked-form {
+  gap: 8px;
+}

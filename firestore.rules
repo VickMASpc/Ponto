@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is an admin
+    function isAdmin() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Helper to check if the user is the owner of the document
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Workers collection
+    match /workers/{workerId} {
+      allow read: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // Reference data (Departments and Titles)
+    match /departments/{id} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    match /titles/{id} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Attendance logs
+    match /attendance/{id} {
+      allow read: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null; // Workers can clock in
+      allow update: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+    }
+
+    // IT Admin Config (Needs to be readable for verification)
+    match /system/config {
+      allow read: if true; // Required for the IT login check before full auth
+      allow write: if false; // Only manageable via console
+    }
+  }
+}
