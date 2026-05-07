@@ -18,7 +18,7 @@ Um sistema simples e funcional para registro de presença de funcionários com F
 * Minha ideia inicial é que cada representante de cada grupo (departamento) adicione seus funcionários e cargos e alguém do TI ficaria responsável por adicionar os administradores.
 
 ## Deployment
-* O sistema é completamente acessível pelo github pages (https://vickmaspc.github.io/PropostaPonto/).
+* O sistema é completamente acessível pelo github pages (https://vickmaspc.github.io/Pontos/).
 
 ## Configurações do Repositório
 
