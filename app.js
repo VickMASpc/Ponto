@@ -61,7 +61,7 @@ const fmtTime = (value) => {
   const date = value instanceof Timestamp ? value.toDate() : new Date(value);
   return new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(date);
 };
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 const normalize = (value) => String(value || "").trim().toLowerCase();
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -434,19 +434,27 @@ function showBadge(workerId) {
   $("badgeQrId").textContent = worker.qrId || "sem QR";
 
   const canvas = $("badgeQrCanvas");
-  canvas.innerHTML = "";
+  const ctx = canvas.getContext("2d");
+  if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (worker.qrId && typeof QRCode !== "undefined") {
-    new QRCode(canvas, {
-      text: worker.qrId,
+  if (worker.qrId && typeof QRCode !== "undefined" && typeof QRCode.toCanvas === "function") {
+    QRCode.toCanvas(canvas, worker.qrId, {
       width: 200,
-      height: 200,
-      colorDark: "#152033",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.M
+      color: {
+        dark: "#152033",
+        light: "#ffffff"
+      },
+      errorCorrectionLevel: "M"
+    }, (err) => {
+      if (err) {
+        console.error("Erro ao gerar QR do crachá:", err);
+      }
     });
-  } else {
-    canvas.textContent = "QR indisponível";
+  } else if (ctx) {
+    ctx.font = "14px sans-serif";
+    ctx.fillStyle = "#6b7280";
+    ctx.textAlign = "center";
+    ctx.fillText("QR indisponível", canvas.width / 2, canvas.height / 2);
   }
 
   $("badgeModalOverlay").classList.remove("hidden");
@@ -482,7 +490,9 @@ async function loadGestorWorkers() {
       collection(db, "workers"),
       where("departmentId", "==", deptId)
     ));
-    state.gestorWorkers = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    state.gestorWorkers = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((worker) => (worker.role || "worker") === "worker" && worker.active !== false);
   } catch (err) {
     console.error("Erro ao carregar workers do gestor:", err);
     state.gestorWorkers = [];
@@ -508,7 +518,7 @@ async function renderGestorDashboard() {
     $("gestorMetricPresent").textContent = present.length;
     $("gestorMetricScans").textContent = records.length;
 
-    $("gestorPresentTable").innerHTML = records.map((r) => `
+    $("gestorPresentTable").innerHTML = present.map((r) => `
       <tr>
         <td>${escapeHtml(r.workerName || "—")}</td>
         <td>${fmtTime(r.clockInAt)}</td>
@@ -525,7 +535,7 @@ async function renderGestorDashboard() {
         <td>${r.clockOutAt ? fmtTime(r.clockOutAt) : fmtTime(r.clockInAt)}</td>
         <td>${escapeHtml(r.method || "self")}</td>
       </tr>
-    `).join("") || `<tr><td colspan="4">Nenhum scan hoje.</td></tr>`;
+    `).join("") || `<tr><td colspan="4">Nenhum registro hoje.</td></tr>`;
 
   } catch (err) {
     console.error("Erro ao carregar dashboard do gestor:", err);
@@ -616,6 +626,7 @@ async function lookupWorkerAttendance(worker) {
     const snap = await getDocs(query(
       collection(db, "attendance"),
       where("workerId", "==", worker.id),
+      where("departmentId", "==", state.userProfile.departmentId),
       where("status", "==", "clocked-in"),
       limit(1)
     ));
@@ -699,6 +710,8 @@ async function registerAttendanceByGestor(action) {
       await updateDoc(doc(db, "attendance", attendanceId), {
         clockOutAt: serverTimestamp(),
         status: "completed",
+        clockOutMethod: "camera-qr",
+        clockOutRecordedByUserId: state.currentUser.uid,
         updatedAt: serverTimestamp()
       });
     } else {

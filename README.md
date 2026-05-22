@@ -29,7 +29,7 @@ O registro salva: `workerId`, `departmentId`, `recordedByUserId`, `method: "came
 ## Biblioteca de QR
 
 - **Leitura**: [`html5-qrcode`](https://github.com/mebjas/html5-qrcode) v2.3.8 — câmera nativa no browser, sem plugins.
-- **Geração** (crachá): [`qrcode.js`](https://github.com/davidshimjs/qrcodejs) v1.5.3.
+- **Geração** (crachá): [`qrcode`](https://github.com/soldair/node-qrcode) v1.5.3 (uso via `QRCode.toCanvas(...)`).
 
 ## Feedbacks de Erro (Scanner)
 
@@ -76,3 +76,25 @@ Qualquer push na branch principal aciona deploy automático via GitHub Actions.
 ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 ![Firebase](https://img.shields.io/badge/Firebase-FF6600?style=for-the-badge&logo=firebase&logoColor=white)
+
+## Configuração obrigatória no Firebase
+
+Para o MVP funcionar em produção, configure estes itens no projeto Firebase:
+
+1. **Publicar regras do Firestore**
+   - Faça deploy do arquivo `firestore.rules`:
+   - `firebase deploy --only firestore:rules`
+
+2. **Habilitar autenticação por E-mail/Senha**
+   - Firebase Console → Authentication → Sign-in method → **Email/Password** = Enabled.
+
+3. **Criar índice composto da coleção `attendance`**
+   - Campos (nesta ordem):
+     - `departmentId` **ASC**
+     - `dateKey` **ASC**
+     - `clockInAt` **DESC**
+   - Esse índice é necessário para as consultas do painel de gestor.
+
+4. **Garantir `qrId` nos funcionários existentes**
+   - Novos funcionários recebem `qrId` automaticamente no cadastro.
+   - Funcionários já existentes (criados antes dessa regra) precisam receber um `qrId` único manualmente para escaneamento no gestor.
