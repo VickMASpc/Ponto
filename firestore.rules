@@ -1,31 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if user is an admin
+
     function isAdmin() {
       return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Helper to check if the user is the owner of the document
+    function isGestor() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'gestor';
+    }
+
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
+    }
+
+    function gestorDeptId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.departmentId;
     }
 
     // Users collection
     match /users/{userId} {
       allow create: if (exists(/databases/$(database)/documents/system/config) && request.resource.data.it_access_code == get(/databases/$(database)/documents/system/config).data.it_access_code) || isAdmin();
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin() || isGestor();
       allow update, delete: if isAdmin();
     }
 
     // Workers collection
     match /workers/{workerId} {
-      allow read: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      // Gestor can read workers in their department (needed for QR lookup)
+      allow read: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid) || (isGestor() && resource.data.departmentId == gestorDeptId());
       allow write: if isAdmin();
     }
 
-    // Reference data (Departments and Titles)
+    // Reference data
     match /departments/{id} {
       allow read: if request.auth != null;
       allow write: if isAdmin();
@@ -37,15 +44,21 @@ service cloud.firestore {
 
     // Attendance logs
     match /attendance/{id} {
-      allow read: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
-      allow create: if request.auth != null; // Workers can clock in
-      allow update: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      // Gestor can read attendance for their department; workers can read their own
+      allow read: if isAdmin()
+        || (request.auth != null && resource.data.userId == request.auth.uid)
+        || (isGestor() && resource.data.departmentId == gestorDeptId());
+      // Workers self-clock OR gestor registers via camera-qr
+      allow create: if request.auth != null;
+      allow update: if isAdmin()
+        || (request.auth != null && resource.data.userId == request.auth.uid)
+        || (isGestor() && resource.data.departmentId == gestorDeptId());
     }
 
-    // IT Admin Config (Needs to be readable for verification)
+    // IT Admin Config
     match /system/config {
-      allow read: if true; // Required for the IT login check before full auth
-      allow write: if false; // Only manageable via console
+      allow read: if true;
+      allow write: if false;
     }
   }
 }

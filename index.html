@@ -10,6 +10,7 @@
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <main class="app-shell">
+      <!-- ═══ LOGIN ═══════════════════════════════════════════════ -->
       <section id="authView" class="auth-card">
         <div class="brand-row">
           <div class="brand-mark">SP</div>
@@ -18,7 +19,6 @@
             <p>Controle de presença para funcionários e administradores.</p>
           </div>
         </div>
-
         <form id="loginForm" class="stacked-form">
           <label>
             E-mail
@@ -32,6 +32,7 @@
         </form>
       </section>
 
+      <!-- ═══ APP SHELL ════════════════════════════════════════════ -->
       <section id="appView" class="hidden">
         <header class="topbar">
           <div>
@@ -44,6 +45,7 @@
           </div>
         </header>
 
+        <!-- ── WORKER VIEW ─────────────────────────────────────── -->
         <section id="workerView" class="hidden dashboard-grid worker-grid">
           <article class="panel hero-panel">
             <p class="eyebrow">Terminal do funcionário</p>
@@ -78,6 +80,57 @@
           </article>
         </section>
 
+        <!-- ── GESTOR VIEW ─────────────────────────────────────── -->
+        <section id="gestorView" class="hidden">
+          <div class="gestor-grid">
+            <!-- Launch scanner -->
+            <article class="panel hero-panel wide-panel">
+              <p class="eyebrow" id="gestorDeptLabel">Departamento</p>
+              <h3>Modo Gestor</h3>
+              <p>Escaneie o QR do crachá do funcionário para registrar presença.</p>
+              <button id="openScannerBtn" class="scan-launch-btn">
+                <span class="btn-icon">📷</span> Abrir Scanner de QR
+              </button>
+            </article>
+
+            <!-- Metrics -->
+            <article class="metric-card">
+              <span id="gestorMetricPresent">0</span>
+              <p>Presentes hoje</p>
+            </article>
+            <article class="metric-card">
+              <span id="gestorMetricScans">0</span>
+              <p>Scans hoje</p>
+            </article>
+
+            <!-- Present today -->
+            <article class="panel wide-panel">
+              <div class="panel-heading">
+                <h3>Presentes agora</h3>
+                <button id="refreshGestorBtn" class="ghost-btn small-btn">Atualizar</button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Funcionário</th><th>Entrada</th><th>Saída</th><th>Status</th></tr></thead>
+                  <tbody id="gestorPresentTable"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <!-- Recent scans -->
+            <article class="panel wide-panel">
+              <h3>Scans recentes (hoje)</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Funcionário</th><th>Tipo</th><th>Horário</th><th>Método</th></tr></thead>
+                  <tbody id="gestorScansTable"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- ── ADMIN VIEW ──────────────────────────────────────── -->
         <section id="adminView" class="hidden admin-layout">
           <aside class="side-nav">
             <button class="tab-btn active" data-tab="overviewPanel">Visão Geral</button>
@@ -88,6 +141,7 @@
           </aside>
 
           <div class="admin-content">
+            <!-- Overview -->
             <section id="overviewPanel" class="tab-panel">
               <div class="metric-grid">
                 <article class="metric-card"><span id="metricWorkers">0</span><p>Funcionários ativos</p></article>
@@ -109,11 +163,12 @@
               </article>
             </section>
 
+            <!-- Workers -->
             <section id="workersPanel" class="tab-panel hidden">
               <article class="panel">
                 <div class="panel-heading">
-                  <h3>Adicionar funcionário</h3>
-                  <p>Crie uma conta de acesso e perfil de funcionário.</p>
+                  <h3>Adicionar usuário</h3>
+                  <p>Crie uma conta de funcionário ou gestor.</p>
                 </div>
                 <form id="workerForm" class="form-grid">
                   <input id="workerName" placeholder="Nome completo" required />
@@ -121,23 +176,28 @@
                   <input id="workerPassword" type="password" placeholder="Senha temporária" minlength="6" required />
                   <select id="workerDepartment" required></select>
                   <select id="workerTitle" required></select>
-                  <button class="primary-btn" type="submit">Adicionar funcionário</button>
+                  <select id="workerRole">
+                    <option value="worker">Funcionário</option>
+                    <option value="gestor">Gestor</option>
+                  </select>
+                  <button class="primary-btn" type="submit" style="grid-column: 1 / -1">Adicionar</button>
                 </form>
               </article>
               <article class="panel">
                 <div class="panel-heading split">
-                  <h3>Funcionários</h3>
-                  <input id="workerSearch" class="search-input" placeholder="Buscar funcionários..." />
+                  <h3>Funcionários e Gestores</h3>
+                  <input id="workerSearch" class="search-input" placeholder="Buscar..." />
                 </div>
                 <div class="table-wrap">
                   <table>
-                    <thead><tr><th>Nome</th><th>E-mail</th><th>Departamento</th><th>Cargo</th><th>Status</th><th>Ações</th></tr></thead>
+                    <thead><tr><th>Nome</th><th>E-mail</th><th>Depto</th><th>Cargo</th><th>Papel</th><th>Status</th><th>Ações</th></tr></thead>
                     <tbody id="workersTable"></tbody>
                   </table>
                 </div>
               </article>
             </section>
 
+            <!-- Departments -->
             <section id="departmentsPanel" class="tab-panel hidden">
               <article class="panel compact-panel">
                 <h3>Departamentos</h3>
@@ -149,6 +209,7 @@
               </article>
             </section>
 
+            <!-- Titles -->
             <section id="titlesPanel" class="tab-panel hidden">
               <article class="panel compact-panel">
                 <h3>Cargos</h3>
@@ -160,6 +221,7 @@
               </article>
             </section>
 
+            <!-- Attendance -->
             <section id="attendancePanel" class="tab-panel hidden">
               <article class="panel">
                 <div class="panel-heading split">
@@ -176,7 +238,7 @@
                 </div>
                 <div class="table-wrap">
                   <table>
-                    <thead><tr><th>Data</th><th>Funcionário</th><th>Departamento</th><th>Entrada</th><th>Saída</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Data</th><th>Funcionário</th><th>Departamento</th><th>Entrada</th><th>Saída</th><th>Status</th><th>Método</th></tr></thead>
                     <tbody id="attendanceTable"></tbody>
                   </table>
                 </div>
@@ -186,6 +248,68 @@
         </section>
       </section>
     </main>
+
+    <!-- ═══ SCANNER SCREEN (fullscreen) ═════════════════════════ -->
+    <div id="scannerScreen" class="scanner-screen hidden">
+      <div class="scanner-topbar">
+        <h3>📷 Modo Scanner — QR Code</h3>
+        <button id="closeScannerBtn" class="scanner-close-btn">✕ Fechar</button>
+      </div>
+      <div id="qr-reader"></div>
+      <p class="scanner-hint" id="scannerHint">Aponte a câmera para o QR do crachá do funcionário.</p>
+      <div id="cameraDeniedMsg" class="camera-denied-msg hidden">
+        ⚠️ Acesso à câmera negado.<br>
+        Verifique as permissões do navegador e recarregue a página.
+      </div>
+    </div>
+
+    <!-- ═══ SCAN RESULT OVERLAY ══════════════════════════════════ -->
+    <div id="scanResultOverlay" class="scan-result-overlay hidden">
+      <!-- Worker found card -->
+      <div id="scanWorkerCard" class="scan-result-card hidden">
+        <div class="scan-result-avatar" id="scanWorkerAvatar">?</div>
+        <div class="scan-result-name" id="scanWorkerName">—</div>
+        <div class="scan-result-dept" id="scanWorkerDept">—</div>
+        <span class="scan-result-status" id="scanWorkerStatus">—</span>
+        <div class="scan-actions">
+          <button id="registrarEntradaBtn" class="entrada-btn hidden">✅ Registrar Entrada</button>
+          <button id="registrarSaidaBtn" class="saida-btn hidden">🏁 Registrar Saída</button>
+          <button id="cancelScanBtn" class="cancel-scan-btn">✕ Cancelar</button>
+        </div>
+      </div>
+      <!-- Error card -->
+      <div id="scanErrorCard" class="scan-error-card hidden">
+        <div class="scan-error-icon" id="scanErrorIcon">⚠️</div>
+        <div class="scan-error-title" id="scanErrorTitle">Erro</div>
+        <p class="scan-error-text" id="scanErrorText"></p>
+        <button id="dismissScanErrorBtn" class="primary-btn">Continuar</button>
+      </div>
+    </div>
+
+    <!-- ═══ CONFIRMATION OVERLAY ═════════════════════════════════ -->
+    <div id="confirmationOverlay" class="confirmation-overlay hidden">
+      <div class="confirm-icon" id="confirmIcon">✅</div>
+      <div class="confirm-type" id="confirmType">ENTRADA</div>
+      <div class="confirm-name" id="confirmName">—</div>
+      <div class="confirm-time" id="confirmTime">—</div>
+      <div class="confirm-dept" id="confirmDept">—</div>
+    </div>
+
+    <!-- ═══ BADGE MODAL ═══════════════════════════════════════════ -->
+    <div id="badgeModalOverlay" class="badge-modal-overlay hidden">
+      <div class="badge-card">
+        <div class="badge-school">Sistema de Ponto — Escola</div>
+        <div class="badge-name" id="badgeName">—</div>
+        <div class="badge-dept" id="badgeDept">—</div>
+        <div class="badge-title" id="badgeTitleRole">—</div>
+        <div id="badgeQrCanvas"></div>
+        <div class="badge-qrid" id="badgeQrId"></div>
+        <div class="badge-actions">
+          <button id="printBadgeBtn" class="primary-btn">🖨️ Imprimir</button>
+          <button id="closeBadgeBtn" class="ghost-btn">Fechar</button>
+        </div>
+      </div>
+    </div>
 
     <!-- IT Admin Access -->
     <div id="itAdminSection" class="it-admin-section">
@@ -208,6 +332,9 @@
       </div>
     </div>
 
-    <script type="module" src="app.js?v=3"></script>
+    <!-- QR Libraries -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script type="module" src="app.js?v=4"></script>
   </body>
 </html>

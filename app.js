@@ -38,22 +38,32 @@ const state = {
   titles: [],
   workers: [],
   attendance: [],
-  itCode: null
+  itCode: null,
+  // Gestor-specific
+  gestorWorkers: [],    // workers of gestor's department
+  qrScanner: null,      // Html5Qrcode instance
+  scanPaused: false,    // prevents double-scan while overlay is up
 };
 
 const $ = (id) => document.getElementById(id);
 const fmtDateTime = (value) => {
   if (!value) return "—";
   const date = value instanceof Timestamp ? value.toDate() : new Date(value);
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short" }).format(date);
 };
 const fmtDate = (value) => {
   if (!value) return "—";
   const date = value instanceof Timestamp ? value.toDate() : new Date(value);
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(date);
+};
+const fmtTime = (value) => {
+  if (!value) return "—";
+  const date = value instanceof Timestamp ? value.toDate() : new Date(value);
+  return new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(date);
 };
 const todayKey = () => new Date().toISOString().slice(0, 10);
 const normalize = (value) => String(value || "").trim().toLowerCase();
+const uuid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 function showToast(message, type = "success") {
   const toast = $("toast");
@@ -85,7 +95,11 @@ function displayAppView(role) {
   $("appView").classList.remove("hidden");
   $("workerView").classList.toggle("hidden", role !== "worker");
   $("adminView").classList.toggle("hidden", role !== "admin");
-  $("roleBadge").textContent = role;
+  $("gestorView").classList.toggle("hidden", role !== "gestor");
+
+  const badge = $("roleBadge");
+  badge.textContent = role === "gestor" ? "Gestor" : role === "admin" ? "Admin" : "Funcionário";
+  badge.className = `badge ${role === "gestor" ? "gestor" : ""}`;
 }
 
 async function getUserProfile(uid) {
@@ -100,7 +114,6 @@ async function loadReferenceData() {
     getDocs(query(collection(db, "titles"), orderBy("name")))
   ];
 
-  // Only admins can list all workers
   if (role === "admin") {
     tasks.push(getDocs(query(collection(db, "workers"), orderBy("name"))));
   }
@@ -112,7 +125,7 @@ async function loadReferenceData() {
     if (role === "admin" && results[2]) {
       state.workers = results[2].docs.map((d) => ({ id: d.id, ...d.data() }));
     }
-    renderReferenceControls();
+    if (role === "admin") renderReferenceControls();
   } catch (error) {
     console.error("Error loading reference data:", error);
     if (error.code !== "permission-denied") {
@@ -168,11 +181,21 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+// ─── WORKER EXPERIENCE ────────────────────────────────────────────────────────
+
 async function loadWorkerExperience() {
   const workerId = state.userProfile.workerId;
   if (!workerId) throw new Error("Esta conta não tem um perfil de funcionário atribuído.");
   const workerSnap = await getDoc(doc(db, "workers", workerId));
   if (!workerSnap.exists()) throw new Error("Perfil de funcionário não encontrado.");
+
+  // Load reference data for worker (departments/titles)
+  const [deptSnap, titleSnap] = await Promise.all([
+    getDocs(query(collection(db, "departments"), orderBy("name"))),
+    getDocs(query(collection(db, "titles"), orderBy("name")))
+  ]);
+  state.departments = deptSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  state.titles = titleSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
   state.workerProfile = { id: workerSnap.id, ...workerSnap.data() };
   await loadWorkerActiveAttendance(workerId);
@@ -192,7 +215,7 @@ async function loadWorkerActiveAttendance(workerId) {
 
 async function renderWorkerDashboard() {
   const worker = state.workerProfile;
-  $("welcomeTitle").textContent = `Welcome, ${worker.name}`;
+  $("welcomeTitle").textContent = `Olá, ${worker.name}`;
   $("workerNameValue").textContent = worker.name;
   $("workerDepartmentValue").textContent = departmentName(worker.departmentId);
   $("workerTitleValue").textContent = titleName(worker.titleId);
@@ -220,9 +243,9 @@ async function renderWorkerAttendance() {
   $("workerAttendanceTable").innerHTML = rows.map((row) => `
     <tr>
       <td>${fmtDate(row.clockInAt)}</td>
-      <td>${fmtDateTime(row.clockInAt)}</td>
-      <td>${fmtDateTime(row.clockOutAt)}</td>
-      <td>${escapeHtml(row.status)}</td>
+      <td>${fmtTime(row.clockInAt)}</td>
+      <td>${fmtTime(row.clockOutAt)}</td>
+      <td>${row.status === "clocked-in" ? "Em serviço" : "Concluído"}</td>
     </tr>
   `).join("") || `<tr><td colspan="4">Nenhum registro de presença ainda.</td></tr>`;
 }
@@ -250,6 +273,8 @@ async function handleClockAction() {
         clockOutAt: null,
         dateKey: todayKey(),
         status: "clocked-in",
+        method: "self",
+        recordedByUserId: state.currentUser.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -264,6 +289,8 @@ async function handleClockAction() {
     setLoading(button, false);
   }
 }
+
+// ─── ADMIN EXPERIENCE ─────────────────────────────────────────────────────────
 
 async function loadAdminDashboard() {
   await loadReferenceData();
@@ -280,12 +307,14 @@ async function renderWorkers() {
       <td>${escapeHtml(worker.email)}</td>
       <td>${escapeHtml(departmentName(worker.departmentId))}</td>
       <td>${escapeHtml(titleName(worker.titleId))}</td>
+      <td>${escapeHtml(worker.role || "worker")}</td>
       <td>${worker.active === false ? "Inativo" : "Ativo"}</td>
       <td class="row-actions">
+        <button class="ghost-btn small-btn" data-badge-worker="${worker.id}">🪪 Crachá</button>
         <button class="ghost-btn small-btn" data-toggle-worker="${worker.id}" data-active="${worker.active === false ? "true" : "false"}">${worker.active === false ? "Ativar" : "Desativar"}</button>
       </td>
     </tr>
-  `).join("") || `<tr><td colspan="6">Nenhum funcionário encontrado.</td></tr>`;
+  `).join("") || `<tr><td colspan="7">Nenhum funcionário encontrado.</td></tr>`;
   $("metricWorkers").textContent = state.workers.filter((w) => w.active !== false).length;
 }
 
@@ -303,11 +332,12 @@ async function renderAttendance() {
       <td>${fmtDate(record.clockInAt)}</td>
       <td>${escapeHtml(record.workerName || workerName(record.workerId))}</td>
       <td>${escapeHtml(departmentName(record.departmentId))}</td>
-      <td>${fmtDateTime(record.clockInAt)}</td>
-      <td>${fmtDateTime(record.clockOutAt)}</td>
-      <td>${escapeHtml(record.status)}</td>
+      <td>${fmtTime(record.clockInAt)}</td>
+      <td>${fmtTime(record.clockOutAt)}</td>
+      <td>${record.status === "clocked-in" ? "Em serviço" : "Concluído"}</td>
+      <td>${escapeHtml(record.method || "self")}</td>
     </tr>
-  `).join("") || `<tr><td colspan="6">Nenhum registro de presença encontrado.</td></tr>`;
+  `).join("") || `<tr><td colspan="7">Nenhum registro de presença encontrado.</td></tr>`;
 }
 
 async function renderOverview() {
@@ -321,17 +351,18 @@ async function renderOverview() {
         <td>${escapeHtml(record.workerName || worker?.name || "—")}</td>
         <td>${escapeHtml(departmentName(record.departmentId))}</td>
         <td>${escapeHtml(titleName(record.titleId))}</td>
-        <td>${fmtDateTime(record.clockInAt)}</td>
+        <td>${fmtTime(record.clockInAt)}</td>
       </tr>
     `;
   }).join("") || `<tr><td colspan="4">Nenhum funcionário está em serviço no momento.</td></tr>`;
 }
 
-async function createWorkerAccount({ name, email, password, departmentId, titleId }) {
+async function createWorkerAccount({ name, email, password, departmentId, titleId, role }) {
   const secondaryApp = initializeApp(firebaseConfig, `worker-create-${Date.now()}`);
   const secondaryAuth = getAuth(secondaryApp);
   try {
     const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    const qrId = uuid();
     const workerRef = doc(collection(db, "workers"));
     await setDoc(workerRef, {
       name,
@@ -339,18 +370,24 @@ async function createWorkerAccount({ name, email, password, departmentId, titleI
       departmentId,
       titleId,
       userId: credential.user.uid,
+      role: role || "worker",
+      qrId,
       active: true,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
-    await setDoc(doc(db, "users", credential.user.uid), {
+    const userDoc = {
       email,
-      role: "worker",
+      role: role || "worker",
       workerId: workerRef.id,
       active: true,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
-    });
+    };
+    if (role === "gestor") {
+      userDoc.departmentId = departmentId;
+    }
+    await setDoc(doc(db, "users", credential.user.uid), userDoc);
   } finally {
     await signOut(secondaryAuth).catch(() => {});
     await deleteApp(secondaryApp).catch(() => {});
@@ -366,7 +403,7 @@ async function createAdminAccount({ email, password, itCode }) {
       email,
       role: "admin",
       active: true,
-      it_access_code: itCode, // Authorization for Firestore rules
+      it_access_code: itCode,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -385,6 +422,336 @@ async function addNamedRecord(collectionName, name) {
   });
 }
 
+// ─── BADGE / QR GENERATION ────────────────────────────────────────────────────
+
+function showBadge(workerId) {
+  const worker = state.workers.find((w) => w.id === workerId);
+  if (!worker) return;
+
+  $("badgeName").textContent = worker.name;
+  $("badgeDept").textContent = departmentName(worker.departmentId);
+  $("badgeTitleRole").textContent = `${titleName(worker.titleId)} · ${worker.role === "gestor" ? "Gestor" : "Funcionário"}`;
+  $("badgeQrId").textContent = worker.qrId || "sem QR";
+
+  const canvas = $("badgeQrCanvas");
+  canvas.innerHTML = "";
+
+  if (worker.qrId && typeof QRCode !== "undefined") {
+    new QRCode(canvas, {
+      text: worker.qrId,
+      width: 200,
+      height: 200,
+      colorDark: "#152033",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } else {
+    canvas.textContent = "QR indisponível";
+  }
+
+  $("badgeModalOverlay").classList.remove("hidden");
+}
+
+// ─── GESTOR EXPERIENCE ────────────────────────────────────────────────────────
+
+async function loadGestorExperience() {
+  const profile = state.userProfile;
+  if (!profile.departmentId) throw new Error("Gestor sem departamento atribuído. Contate o administrador.");
+
+  // Load departments and titles for display
+  const [deptSnap, titleSnap] = await Promise.all([
+    getDocs(query(collection(db, "departments"), orderBy("name"))),
+    getDocs(query(collection(db, "titles"), orderBy("name")))
+  ]);
+  state.departments = deptSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  state.titles = titleSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  // Load workers of this department
+  await loadGestorWorkers();
+
+  $("welcomeTitle").textContent = `Gestor — ${departmentName(profile.departmentId)}`;
+  $("gestorDeptLabel").textContent = departmentName(profile.departmentId);
+
+  await renderGestorDashboard();
+}
+
+async function loadGestorWorkers() {
+  const deptId = state.userProfile.departmentId;
+  try {
+    const snap = await getDocs(query(
+      collection(db, "workers"),
+      where("departmentId", "==", deptId)
+    ));
+    state.gestorWorkers = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error("Erro ao carregar workers do gestor:", err);
+    state.gestorWorkers = [];
+  }
+}
+
+async function renderGestorDashboard() {
+  const deptId = state.userProfile.departmentId;
+  const today = todayKey();
+
+  try {
+    const snap = await getDocs(query(
+      collection(db, "attendance"),
+      where("departmentId", "==", deptId),
+      where("dateKey", "==", today),
+      orderBy("clockInAt", "desc"),
+      limit(50)
+    ));
+    const records = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    // Present now (clocked-in)
+    const present = records.filter((r) => r.status === "clocked-in");
+    $("gestorMetricPresent").textContent = present.length;
+    $("gestorMetricScans").textContent = records.length;
+
+    $("gestorPresentTable").innerHTML = records.map((r) => `
+      <tr>
+        <td>${escapeHtml(r.workerName || "—")}</td>
+        <td>${fmtTime(r.clockInAt)}</td>
+        <td>${fmtTime(r.clockOutAt)}</td>
+        <td>${r.status === "clocked-in" ? "✅ Em serviço" : "🏁 Saiu"}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="4">Nenhuma presença registrada hoje.</td></tr>`;
+
+    // Recent scans = all attendance events sorted
+    $("gestorScansTable").innerHTML = records.slice(0, 20).map((r) => `
+      <tr>
+        <td>${escapeHtml(r.workerName || "—")}</td>
+        <td>${r.clockOutAt ? "Saída" : "Entrada"}</td>
+        <td>${r.clockOutAt ? fmtTime(r.clockOutAt) : fmtTime(r.clockInAt)}</td>
+        <td>${escapeHtml(r.method || "self")}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="4">Nenhum scan hoje.</td></tr>`;
+
+  } catch (err) {
+    console.error("Erro ao carregar dashboard do gestor:", err);
+    showToast("Erro ao carregar dados do departamento.", "error");
+  }
+}
+
+// ─── QR SCANNER ───────────────────────────────────────────────────────────────
+
+function openScanner() {
+  $("scannerScreen").classList.remove("hidden");
+  $("cameraDeniedMsg").classList.add("hidden");
+  $("scannerHint").classList.remove("hidden");
+  state.scanPaused = false;
+  startScanner();
+}
+
+function closeScanner() {
+  stopScanner();
+  $("scannerScreen").classList.add("hidden");
+  hideScanResultOverlay();
+}
+
+async function startScanner() {
+  if (typeof Html5Qrcode === "undefined") {
+    $("scannerHint").textContent = "Biblioteca de QR não carregada. Verifique a conexão.";
+    return;
+  }
+
+  // Clean up any previous instance
+  if (state.qrScanner) {
+    try { await state.qrScanner.stop(); } catch (_) {}
+    try { state.qrScanner.clear(); } catch (_) {}
+    state.qrScanner = null;
+  }
+
+  state.qrScanner = new Html5Qrcode("qr-reader");
+
+  try {
+    await state.qrScanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 280, height: 280 }, aspectRatio: 1.0 },
+      onQrCodeScanned,
+      () => {} // silent decode errors (frames without QR)
+    );
+    $("scannerHint").textContent = "Aponte a câmera para o QR do crachá do funcionário.";
+  } catch (err) {
+    console.error("Camera error:", err);
+    if (err && (err.name === "NotAllowedError" || String(err).includes("NotAllowedError") || String(err).includes("Permission"))) {
+      $("cameraDeniedMsg").classList.remove("hidden");
+      $("scannerHint").classList.add("hidden");
+    } else {
+      $("scannerHint").textContent = `Erro ao acessar câmera: ${err?.message || err}`;
+    }
+  }
+}
+
+async function stopScanner() {
+  if (state.qrScanner) {
+    try { await state.qrScanner.stop(); } catch (_) {}
+    try { state.qrScanner.clear(); } catch (_) {}
+    state.qrScanner = null;
+  }
+}
+
+function onQrCodeScanned(decodedText) {
+  if (state.scanPaused) return;
+  state.scanPaused = true;
+
+  const qrId = decodedText.trim();
+  const worker = state.gestorWorkers.find((w) => w.qrId === qrId);
+
+  if (!worker) {
+    showScanError(
+      "⚠️",
+      "QR não reconhecido",
+      "Este QR não pertence a nenhum funcionário do seu departamento."
+    );
+    return;
+  }
+
+  // Lookup active attendance for this worker (today)
+  lookupWorkerAttendance(worker);
+}
+
+async function lookupWorkerAttendance(worker) {
+  try {
+    const snap = await getDocs(query(
+      collection(db, "attendance"),
+      where("workerId", "==", worker.id),
+      where("status", "==", "clocked-in"),
+      limit(1)
+    ));
+    const activeRec = snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+    showScanWorkerCard(worker, activeRec);
+  } catch (err) {
+    console.error(err);
+    showScanError("⚠️", "Erro de leitura", "Não foi possível verificar o status do funcionário.");
+  }
+}
+
+function showScanResultOverlay() {
+  $("scanResultOverlay").classList.remove("hidden");
+  $("scanWorkerCard").classList.add("hidden");
+  $("scanErrorCard").classList.add("hidden");
+}
+
+function hideScanResultOverlay() {
+  $("scanResultOverlay").classList.add("hidden");
+}
+
+function showScanError(icon, title, text) {
+  showScanResultOverlay();
+  $("scanErrorIcon").textContent = icon;
+  $("scanErrorTitle").textContent = title;
+  $("scanErrorText").textContent = text;
+  $("scanErrorCard").classList.remove("hidden");
+}
+
+function showScanWorkerCard(worker, activeRec) {
+  showScanResultOverlay();
+
+  const initials = worker.name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+  $("scanWorkerAvatar").textContent = initials;
+  $("scanWorkerName").textContent = worker.name;
+  $("scanWorkerDept").textContent = departmentName(worker.departmentId) + " · " + titleName(worker.titleId);
+
+  const statusEl = $("scanWorkerStatus");
+  const entradaBtn = $("registrarEntradaBtn");
+  const saidaBtn = $("registrarSaidaBtn");
+
+  if (activeRec) {
+    statusEl.textContent = `✅ Em serviço desde ${fmtTime(activeRec.clockInAt)}`;
+    statusEl.className = "scan-result-status status-in";
+    entradaBtn.classList.add("hidden");
+    saidaBtn.classList.remove("hidden");
+    saidaBtn.dataset.attendanceId = activeRec.id;
+  } else {
+    statusEl.textContent = "⏸ Fora de serviço";
+    statusEl.className = "scan-result-status status-out";
+    entradaBtn.classList.remove("hidden");
+    saidaBtn.classList.add("hidden");
+  }
+
+  entradaBtn.dataset.workerId = worker.id;
+  entradaBtn.dataset.workerUserId = worker.userId || "";
+  entradaBtn.dataset.workerName = worker.name;
+  entradaBtn.dataset.departmentId = worker.departmentId;
+  entradaBtn.dataset.titleId = worker.titleId;
+  saidaBtn.dataset.workerId = worker.id;
+  saidaBtn.dataset.workerUserId = worker.userId || "";
+  saidaBtn.dataset.workerName = worker.name;
+  saidaBtn.dataset.departmentId = worker.departmentId;
+
+  $("scanWorkerCard").classList.remove("hidden");
+}
+
+async function registerAttendanceByGestor(action) {
+  const btn = action === "entrada" ? $("registrarEntradaBtn") : $("registrarSaidaBtn");
+  setLoading(btn, true, "Salvando...");
+
+  const workerId = btn.dataset.workerId;
+  const workerUserId = btn.dataset.workerUserId; // worker's Firebase Auth UID
+  const workerNameVal = btn.dataset.workerName;
+  const departmentId = btn.dataset.departmentId;
+  const titleId = btn.dataset.titleId;
+  const attendanceId = btn.dataset.attendanceId;
+
+  try {
+    if (action === "saida" && attendanceId) {
+      await updateDoc(doc(db, "attendance", attendanceId), {
+        clockOutAt: serverTimestamp(),
+        status: "completed",
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      await addDoc(collection(db, "attendance"), {
+        workerId,
+        userId: workerUserId || workerId, // worker's Firebase Auth UID so they can read their own history
+        workerName: workerNameVal,
+        departmentId,
+        titleId,
+        clockInAt: serverTimestamp(),
+        clockOutAt: null,
+        dateKey: todayKey(),
+        status: "clocked-in",
+        method: "camera-qr",
+        recordedByUserId: state.currentUser.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    hideScanResultOverlay();
+    showConfirmation(action, workerNameVal, departmentId);
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao registrar presença: " + err.message, "error");
+    setLoading(btn, false);
+    state.scanPaused = false;
+  }
+}
+
+function showConfirmation(action, name, departmentId) {
+  const overlay = $("confirmationOverlay");
+  overlay.className = `confirmation-overlay ${action === "entrada" ? "entrada-confirm" : "saida-confirm"}`;
+
+  $("confirmIcon").textContent = action === "entrada" ? "✅" : "🏁";
+  $("confirmType").textContent = action === "entrada" ? "ENTRADA REGISTRADA" : "SAÍDA REGISTRADA";
+  $("confirmName").textContent = name;
+  $("confirmTime").textContent = new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(new Date());
+  $("confirmDept").textContent = departmentName(departmentId);
+
+  overlay.classList.remove("hidden");
+
+  setTimeout(async () => {
+    overlay.classList.add("hidden");
+    state.scanPaused = false;
+    // Refresh gestor dashboard in background
+    await loadGestorWorkers();
+    await renderGestorDashboard();
+  }, 3000);
+}
+
+// ─── EVENT BINDING ─────────────────────────────────────────────────────────────
+
 function bindEvents() {
   $("loginForm").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -393,13 +760,16 @@ function bindEvents() {
     try {
       await signInWithEmailAndPassword(auth, $("loginEmail").value, $("loginPassword").value);
     } catch (error) {
-      showToast(error.message, "error");
+      showToast("E-mail ou senha inválidos.", "error");
     } finally {
       setLoading(button, false);
     }
   });
 
-  $("logoutBtn").addEventListener("click", () => signOut(auth));
+  $("logoutBtn").addEventListener("click", () => {
+    closeScanner();
+    signOut(auth);
+  });
   $("clockActionBtn").addEventListener("click", handleClockAction);
   $("refreshWorkerLogsBtn").addEventListener("click", renderWorkerAttendance);
   $("refreshOverviewBtn").addEventListener("click", renderOverview);
@@ -408,6 +778,31 @@ function bindEvents() {
   $("attendanceDepartmentFilter").addEventListener("change", renderAttendance);
   $("attendanceStatusFilter").addEventListener("change", renderAttendance);
 
+  // Gestor events
+  $("openScannerBtn").addEventListener("click", openScanner);
+  $("closeScannerBtn").addEventListener("click", closeScanner);
+  $("refreshGestorBtn").addEventListener("click", async () => {
+    await loadGestorWorkers();
+    await renderGestorDashboard();
+  });
+
+  // Scan result events
+  $("registrarEntradaBtn").addEventListener("click", () => registerAttendanceByGestor("entrada"));
+  $("registrarSaidaBtn").addEventListener("click", () => registerAttendanceByGestor("saida"));
+  $("cancelScanBtn").addEventListener("click", () => {
+    hideScanResultOverlay();
+    state.scanPaused = false;
+  });
+  $("dismissScanErrorBtn").addEventListener("click", () => {
+    hideScanResultOverlay();
+    state.scanPaused = false;
+  });
+
+  // Badge events
+  $("closeBadgeBtn").addEventListener("click", () => $("badgeModalOverlay").classList.add("hidden"));
+  $("printBadgeBtn").addEventListener("click", () => window.print());
+
+  // Admin tab nav
   document.querySelectorAll(".tab-btn").forEach((button) => {
     button.addEventListener("click", () => {
       document.querySelectorAll(".tab-btn").forEach((btn) => btn.classList.remove("active"));
@@ -417,6 +812,7 @@ function bindEvents() {
     });
   });
 
+  // Worker / Gestor creation form
   $("workerForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = event.submitter;
@@ -427,11 +823,12 @@ function bindEvents() {
         email: $("workerEmail").value.trim(),
         password: $("workerPassword").value,
         departmentId: $("workerDepartment").value,
-        titleId: $("workerTitle").value
+        titleId: $("workerTitle").value,
+        role: $("workerRole").value
       });
       event.target.reset();
       await loadAdminDashboard();
-      showToast("Conta de funcionário criada com sucesso.");
+      showToast("Conta criada com sucesso.");
     } catch (error) {
       console.error(error);
       showToast(error.message, "error");
@@ -464,6 +861,8 @@ function bindEvents() {
     const departmentId = event.target.dataset?.deleteDepartment;
     const titleId = event.target.dataset?.deleteTitle;
     const workerId = event.target.dataset?.toggleWorker;
+    const badgeWorkerId = event.target.dataset?.badgeWorker;
+
     if (departmentId && confirm("Excluir este departamento? As referências de funcionários existentes não serão alteradas.")) {
       await deleteDoc(doc(db, "departments", departmentId));
       await loadAdminDashboard();
@@ -483,6 +882,9 @@ function bindEvents() {
       }
       await loadAdminDashboard();
       showToast(active ? "Funcionário ativado." : "Funcionário desativado.");
+    }
+    if (badgeWorkerId) {
+      showBadge(badgeWorkerId);
     }
   });
 
@@ -542,6 +944,8 @@ function bindEvents() {
   });
 }
 
+// ─── AUTH STATE ───────────────────────────────────────────────────────────────
+
 onAuthStateChanged(auth, async (user) => {
   try {
     if (!user) {
@@ -559,14 +963,16 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
 
-    await loadReferenceData();
     displayAppView(state.userProfile.role);
+
     if (state.userProfile.role === "admin") {
       await loadAdminDashboard();
     } else if (state.userProfile.role === "worker") {
       await loadWorkerExperience();
+    } else if (state.userProfile.role === "gestor") {
+      await loadGestorExperience();
     } else {
-      throw new Error("Cargo de usuário não suportado.");
+      throw new Error("Papel de usuário não suportado: " + state.userProfile.role);
     }
   } catch (error) {
     console.error(error);
