@@ -437,20 +437,29 @@ function showBadge(workerId) {
   const ctx = canvas.getContext("2d");
   if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (worker.qrId && typeof QRCode !== "undefined" && typeof QRCode.toCanvas === "function") {
-    QRCode.toCanvas(canvas, worker.qrId, {
-      width: 200,
-      color: {
-        dark: "#152033",
-        light: "#ffffff"
-      },
-      errorCorrectionLevel: "M"
-    }, (err) => {
-      if (err) {
-        console.error("Erro ao gerar QR do crachá:", err);
+  if (worker.qrId && typeof QRious !== "undefined") {
+    try {
+      new QRious({
+        element: canvas,
+        value: worker.qrId,
+        size: 200,
+        level: "M",
+        foreground: "#152033",
+        background: "#ffffff"
+      });
+    } catch (error) {
+      console.error("Erro ao gerar QR do crachá:", error);
+
+      if (ctx) {
+        ctx.font = "14px sans-serif";
+        ctx.fillStyle = "#6b7280";
+        ctx.textAlign = "center";
+        ctx.fillText("Erro ao gerar QR", canvas.width / 2, canvas.height / 2);
       }
-    });
+    }
   } else if (ctx) {
+    console.error("Biblioteca QRious não carregada.");
+
     ctx.font = "14px sans-serif";
     ctx.fillStyle = "#6b7280";
     ctx.textAlign = "center";
