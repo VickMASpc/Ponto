@@ -502,21 +502,45 @@ async function loadGestorWorkers() {
 async function renderGestorDashboard() {
   const deptId = state.userProfile.departmentId;
   const today = todayKey();
+  const toMillis = (value) => {
+    if (!value) return 0;
+    if (value instanceof Timestamp) return value.toMillis();
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  };
 
   try {
     const snap = await getDocs(query(
       collection(db, "attendance"),
       where("departmentId", "==", deptId),
       where("dateKey", "==", today),
-      orderBy("clockInAt", "desc"),
-      limit(50)
+      orderBy("clockInAt", "desc")
     ));
     const records = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const events = records.flatMap((record) => {
+      const attendanceEvents = [{
+        workerName: record.workerName,
+        type: "Entrada",
+        at: record.clockInAt,
+        method: record.method || "self"
+      }];
+
+      if (record.status === "completed" && record.clockOutAt) {
+        attendanceEvents.push({
+          workerName: record.workerName,
+          type: "Saída",
+          at: record.clockOutAt,
+          method: record.clockOutMethod || record.method || "self"
+        });
+      }
+
+      return attendanceEvents;
+    }).sort((a, b) => toMillis(b.at) - toMillis(a.at));
 
     // Present now (clocked-in)
     const present = records.filter((r) => r.status === "clocked-in");
     $("gestorMetricPresent").textContent = present.length;
-    $("gestorMetricScans").textContent = records.length;
+    $("gestorMetricScans").textContent = events.length;
 
     $("gestorPresentTable").innerHTML = present.map((r) => `
       <tr>
@@ -527,13 +551,13 @@ async function renderGestorDashboard() {
       </tr>
     `).join("") || `<tr><td colspan="4">Nenhuma presença registrada hoje.</td></tr>`;
 
-    // Recent scans = all attendance events sorted
-    $("gestorScansTable").innerHTML = records.slice(0, 20).map((r) => `
+    // Recent scans = attendance events sorted newest-first
+    $("gestorScansTable").innerHTML = events.slice(0, 20).map((event) => `
       <tr>
-        <td>${escapeHtml(r.workerName || "—")}</td>
-        <td>${r.clockOutAt ? "Saída" : "Entrada"}</td>
-        <td>${r.clockOutAt ? fmtTime(r.clockOutAt) : fmtTime(r.clockInAt)}</td>
-        <td>${escapeHtml(r.method || "self")}</td>
+        <td>${escapeHtml(event.workerName || "—")}</td>
+        <td>${event.type}</td>
+        <td>${fmtTime(event.at)}</td>
+        <td>${escapeHtml(event.method || "self")}</td>
       </tr>
     `).join("") || `<tr><td colspan="4">Nenhum registro hoje.</td></tr>`;
 
@@ -737,8 +761,9 @@ async function registerAttendanceByGestor(action) {
   } catch (err) {
     console.error(err);
     showToast("Erro ao registrar presença: " + err.message, "error");
-    setLoading(btn, false);
     state.scanPaused = false;
+  } finally {
+    setLoading(btn, false);
   }
 }
 
