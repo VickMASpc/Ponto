@@ -8,7 +8,7 @@ Sistema de presença por QR Code para ambientes escolares. Gestores escaneiam cr
 |---|---|
 | **admin** | Painel completo: cria departamentos, cargos, funcionários e gestores; visualiza todos os registros de presença |
 | **gestor** | Tela de scanner QR para o seu departamento; vê presentes do dia e scans recentes |
-| **worker** | Bate ponto próprio (entrada/saída) e vê seu histórico |
+| **funcionário** | Bate ponto próprio (entrada/saída) e vê seu histórico (depreciado)|
 | **TI** | Cria administradores via código de acesso (painel flutuante "IT") |
 
 ## Fluxo de Presença por QR
@@ -48,7 +48,7 @@ Abra: **https://vickmaspc.github.io/Pontos/**
 ### 2. Criar Gestor (como admin)
 1. Faça login com conta admin.
 2. Vá em **Funcionários → Adicionar**.
-3. Preencha nome, e-mail, senha, selecione departamento e **Role = Gestor**.
+3. Preencha nome, e-mail, senha, selecione departamento e tipo de conta **Gestor**.
 4. Confirme criação.
 5. Na lista, clique em **🪪 Crachá** para gerar o QR do funcionário/gestor.
 6. Clique **🖨️ Imprimir** para imprimir o crachá.
@@ -57,7 +57,7 @@ Abra: **https://vickmaspc.github.io/Pontos/**
 1. Faça login com a conta do gestor.
 2. Clique **Abrir Scanner de QR**.
 3. Permita acesso à câmera quando solicitado.
-4. Aponte para o QR de um crachá de funcionário do mesmo departamento.
+4. Aponte para o QR de um crachá de funcionário do mesmo departamento (compatibilidade para diferentes departamentos ainda está em desenvolvimento, no momento, o funcionário DEVE ser do mesmo departamento que o gestor).
 5. Confirme **Registrar Entrada** ou **Registrar Saída**.
 6. O painel "Presentes agora" e "Scans recentes" atualiza automaticamente.
 
@@ -76,25 +76,3 @@ Qualquer push na branch principal aciona deploy automático via GitHub Actions.
 ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 ![Firebase](https://img.shields.io/badge/Firebase-FF6600?style=for-the-badge&logo=firebase&logoColor=white)
-
-## Configuração obrigatória no Firebase
-
-Para o MVP funcionar em produção, configure estes itens no projeto Firebase:
-
-1. **Publicar regras do Firestore**
-   - Faça deploy do arquivo `firestore.rules`:
-   - `firebase deploy --only firestore:rules`
-
-2. **Habilitar autenticação por E-mail/Senha**
-   - Firebase Console → Authentication → Sign-in method → **Email/Password** = Enabled.
-
-3. **Criar índice composto da coleção `attendance`**
-   - Campos (nesta ordem):
-     - `departmentId` **ASC**
-     - `dateKey` **ASC**
-     - `clockInAt` **DESC**
-   - Esse índice é necessário para as consultas do painel de gestor.
-
-4. **Garantir `qrId` nos funcionários existentes**
-   - Novos funcionários recebem `qrId` automaticamente no cadastro.
-   - Funcionários já existentes (criados antes dessa regra) precisam receber um `qrId` único manualmente para escaneamento no gestor.
