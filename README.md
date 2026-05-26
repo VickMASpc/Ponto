@@ -70,6 +70,14 @@ O sistema é acessível via GitHub Pages: **https://vickmaspc.github.io/Pontos/*
 
 Qualquer push na branch principal aciona deploy automático via GitHub Actions.
 
+## Credenciais teste
+- Todas as senhas são `123456`
+- Gestor: `gestorteste@gmail.com`
+- Administrador: `adminteste@gmail.com`
+- Funcionário: `funcionarioteste@gmail.com`
+
+- Nota: A interface de usuário ainda permite bater ponto, ela será refatorada para apenas mostrar registros e potencialmente gráficos de presença e notas de gestor.
+
 ## Tech Stack
 
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
